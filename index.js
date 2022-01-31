@@ -12,6 +12,39 @@ const server = express();
 server.use(json());
 server.use(cors());
 
+setInterval(async () => {
+
+  try {
+    
+    const lastStatusNow = Date.now();
+    await mongoClient.connect();
+    const dbBatePapo = mongoClient.db('batePapoUol');
+    const participantsCollection = dbBatePapo.collection('participants');
+    const messagesCollection = dbBatePapo.collection('messages');
+    const participants = await participantsCollection.find({}).toArray();
+
+    for (const participant of participants){
+      if(participant.lastStatus < lastStatusNow - 10000){
+        await participantsCollection.deleteOne({ lastStatus: participant.lastStatus });
+        console.log(participant.name)
+        await messagesCollection.insertOne({
+          from: participant.name,
+          to: 'Todos',
+          text: 'sai da sala...',
+          type: 'status',
+          time: dayjs().format('HH:mm:ss')
+        })
+      }
+    }
+    mongoClient.close()
+
+  } catch (error) {
+    await mongoClient.connect();
+    res.sendStatus(500);
+    mongoClient.close();
+  }
+}, 15000);
+
 const participantsSchema = joi.object({
   name: joi.string().required()
 });
