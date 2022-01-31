@@ -209,6 +209,38 @@ server.post("/status", async (req, res) => {
 
 });
 
+
+server.delete('/messages/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await mongoClient.connect();
+    const dbBatePapo = mongoClient.db("batePapoUol");
+    const messagesCollection = dbBatePapo.collection("messages")
+    const messageToDelete = await messagesCollection.findOne({ _id: new ObjectId(id) })
+
+    if (!messageToDelete) {
+      res.sendStatus(404)
+      mongoClient.close()
+      return;
+    }
+
+    if (req.headers.user !== messageToDelete.from) {
+      res.sendStatus(401)
+      mongoClient.close()
+      return;
+    }
+
+    await messagesCollection.deleteOne({ _id: new ObjectId(id) })
+
+    res.sendStatus(200)
+    mongoClient.close()
+  } catch (error) {
+    res.status(500).send(error)
+    mongoClient.close()
+  }
+});
+
 server.listen(5000, () => {
     console.log('Running app in http://localhost:5000')
 });  
