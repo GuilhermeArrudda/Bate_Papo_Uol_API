@@ -59,13 +59,13 @@ server.post('/participants', async (req, res) => {
     
         const participantsOn = await participantsCollection.find({}).toArray()
         let participantsList = participantsOn.map(e => e.name)
+        const userName = newParticipant.name
 
-        if(participantsList.includes(newParticipant.name)){
+        if(participantsList.includes(userName)){
             res.status(409).send('Name unavailable.')
             return;
         }
-    
-          await participantsCollection.insertOne({newParticipant, lastStatus: Date.now()});
+          await participantsCollection.insertOne({userName, lastStatus: Date.now()});
     
           let newStatusMsg = {
             from: newParticipant.name,
@@ -88,20 +88,21 @@ server.post('/participants', async (req, res) => {
 
 server.post('/messages', async (req,res) => {
 
-  const user = req.headers.user;
-  const newMessageUser = req.body;
-  await mongoClient.connect();
-  const dbBatePapo = mongoClient.db('batePapoUol')
-  const chatUser = await dbBatePapo.collection('participants').findOne({ name: user });
-  const messageUser = {...newMessageUser, from: user, time: dayjs().format('HH:mm:ss')};
-
-  const validation = messageSchema.validate(newMessageUser);
-    if (validation.error || chatUser || user === "") {
-        res.status(422).send(validation.error);
-        return;
-    }
-
     try {
+
+    const user = req.headers.user;
+    const newMessageUser = req.body;
+    await mongoClient.connect();
+    const dbBatePapo = mongoClient.db('batePapoUol')
+    const chatUser = await dbBatePapo.collection('participants').findOne({ name: user });
+    const messageUser = {...newMessageUser, from: user, time: dayjs().format('HH:mm:ss')};
+
+    const validation = messageSchema.validate(newMessageUser);
+      if (validation.error || chatUser || user === "") {
+          res.status(422).send(validation.error);
+          return;
+      }
+
         await dbBatePapo.collection("messages").insertOne(messageUser)
         res.sendStatus(201);
         mongoClient.close();
@@ -121,7 +122,6 @@ server.get('/messages', async (req, res) => {
   
   if(!messagesLimit){
     res.send(messagesCollection)
-    mongoClient.close();
     return;
   };
   
@@ -142,6 +142,37 @@ server.get('/messages', async (req, res) => {
     res.sendStatus(500)
     mongoClient.close();
   }
+
+});
+
+server.post("/status", async (req, res) => {
+
+  try {
+
+    const user = req.headers.user
+    await mongoClient.connect()
+    const dbBatePapo = mongoClient.db("batePapoUol");
+    const participantsCollection = dbBatePapo.collection("participants")
+    const userChat = await participantsCollection.findOne({ userName: user })
+  
+    if (!userChat) {
+      res.sendStatus(404)
+      mongoClient.close()
+      return
+    }
+
+    await participantsCollection.updateOne({ 
+      name: user
+    }, { $set: { lastStatus: Date.now() } });
+
+    res.sendStatus(200)
+    mongoClient.close()
+
+  } catch {
+    res.sendStatus(500);
+    mongoClient.close()
+  }
+
 
 });
 
